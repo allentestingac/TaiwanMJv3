@@ -43,7 +43,7 @@ db.connect();
 
 const WS_PORT = process.env.REACT_APP_WS_PORT || 8080;
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.server({ server });
 /*server.listen(WS_PORT);*/
 /*const wss = new WebSocketServer({ port: 8080 });*/
 /*console.log(`Websocket server listening on port ${WS_PORT}`);*/
@@ -564,6 +564,6 @@ app.get("*", (req, res) => {
 });
 
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server listening on ${PORT}`);
 });
