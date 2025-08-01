@@ -1,0 +1,16 @@
+{
+  "engines": {
+    "node": "v20.10.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "pg": "^8.13.1",
+    "ws": "^8.18.3"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "build": "npm install"
+  },
+  "type": "module"
+}
