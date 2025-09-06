@@ -83,6 +83,8 @@ wss.on('connection', function connection(ws, request) {
       channels[gid] = [newItem];
     };
     fetchPendingPayment(gid, pid);
+    getAllPendingScores(gid, pid);
+    getAllPayment(gid, pid);
     console.log(channels);
   };
 
@@ -203,7 +205,7 @@ async function sendRequestPaymentMsg(gid, pid, ts, tid, tname, fid, fname, total
     "payerID": fid,
     "payerName": fname,
     "total": total,
-    "half": half
+    "isHalf": half
   };
   sendServerMessage(gid, pid, "REQUEST_PAYMENT", payment);
 };
@@ -284,14 +286,19 @@ app.get("/gamelist", async (req, res) => {
 });
 
 
-app.get("/checkpayment", async (req, res) => {
-  const gameID = req.query.gameID;
-  const playerID = req.query.playerID;
-  const cardID = req.query.cardID;
+function getAllPayment(gid, pid) {
+  let id = 0;
+  for (id=0; id<3; id++) {
+    getPayment(gid, pid, id);
+  };
+};
+
+
+async function getPayment(gid, pid, cid) {
   try {
     const db_result = await db.query(
       "SELECT * FROM payment WHERE gid = $1 AND tid = $2 AND cid = $3 AND (status = $4 OR status = $5 OR status = $6) ORDER BY ts ASC",
-      [Number(gameID), Number(playerID), Number(cardID), "A", "R", "P"]
+      [Number(gid), Number(pid), Number(cid), "A", "R", "P"]
     );
     if (db_result.rowCount > 0) {
       const result = db_result.rows;
@@ -301,39 +308,90 @@ app.get("/checkpayment", async (req, res) => {
           "ts": item.ts,
           "payerID": item.fid,
           "payeeID": item.tid,
-          "cardID": item.cid
+          "cardID": item.cid,
+          "isHalf": item.half
         };
         sendServerMessage(
-          gameID, 
-          playerID, 
+          gid, 
+          pid, 
           ( item.status === "A" ? "ACCEPT_PAYMENT" : 
             item.status === "R" ? "REJECT_PAYMENT" :
             "PENDING_PAYMENT"), 
           data
         );
       });
-      res.json({ 
+      return { 
         result: "success"
-      });
+      };
     } else {
       console.log("No pending advised payment for game " + gameID + " player " + playerID + " card " + cardID);
-      res.json({
+      return {
         result: "success"
-      });
+      };
     };
   } catch (err) {
-    res.json({
+    return {
       result: "error",
       err_msg: "DB error in /advisedPayment: " + err
-    });
+    };
   };
+};
+
+
+
+app.get("/checkpayment", async (req, res) => {
+  const gameID = req.query.gameID;
+  const playerID = req.query.playerID;
+  const cardID = req.query.cardID;
+  const result = await getPayment(gameID, playerID, cardID);
+  return result;
 });
+
+
+function getAllPendingScores(gid, myID) {
+  let id = 0;
+  for (id=1; id<5; id++) {
+    if (Number(id) !== Number(myID)) {
+      const result = getPendingScores(gid, myID, id);
+      const msg = {
+        "fromPID": id.toString(),
+        "count": result.count,
+        "total": result.total
+      };
+      console.log(gid, myID, msg);
+      sendServerMessage(gid, myID, "PENDING_SCORES", msg);
+    };
+  };
+};
+
+
+function getPendingScores(gid, myID, toID) {
+  const score = pending_scores.find( score => 
+    Number(score.gameID) === Number(gid) && Number(score.toPID) === Number(myID) && Number(score.fromPID) === Number(toID)
+  );
+  if (score !== undefined) {
+    return {
+      "result": "success",
+      "count": score.count,
+      "total": score.total
+    };
+  } else {
+    return {
+      "result": "success",
+      "count": 0,
+      "total": 0
+    };
+  };
+};
 
 
 app.get("/checkpendingscores", async (req, res) => {
   const gameID = req.query.gameID;
   const myPID = req.query.myPID;
   const toPID = req.query.toPID;
+  const result = getPendingScores(gameID, myPID, toPID);
+  res.json(result);
+/*  
   const score = pending_scores.find( score => 
     Number(score.gameID) === Number(gameID) && Number(score.toPID) === Number(myPID) && Number(score.fromPID) === Number(toPID)
   );
@@ -349,7 +407,7 @@ app.get("/checkpendingscores", async (req, res) => {
       count: 0,
       total: 0
     });
-  };
+  };*/
 });
 
 
