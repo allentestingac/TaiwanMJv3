@@ -286,10 +286,14 @@ app.get("/gamelist", async (req, res) => {
 });
 
 
-function getAllPayment(gid, pid) {
+async function getAllPayment(gid, pid) {
   let id = 0;
+  let data = {};
   for (id=0; id<3; id++) {
-    getPayment(gid, pid, id);
+    data = await getPayment(gid, pid, id);
+    if (data.result !== "success") {
+      console.log(data.err_msg);
+    }
   };
 };
 
@@ -324,7 +328,7 @@ async function getPayment(gid, pid, cid) {
         result: "success"
       };
     } else {
-      console.log("No pending advised payment for game " + gameID + " player " + playerID + " card " + cardID);
+      console.log("No pending advised payment for game " + gid + " player " + pid + " card " + cid);
       return {
         result: "success"
       };
@@ -344,7 +348,7 @@ app.get("/checkpayment", async (req, res) => {
   const playerID = req.query.playerID;
   const cardID = req.query.cardID;
   const result = await getPayment(gameID, playerID, cardID);
-  return result;
+  res.json(result);
 });
 
 
@@ -927,13 +931,20 @@ app.post("/register", async (req, res) => {
             "UPDATE scoreboard SET name = $1, joined = $2 WHERE gid = $3 AND pid = $4",
             [name_to_register, true, gameID, playerID]
           );
-          const scores = getTempScores(gameID, playerID);
-          res.json({ 
-            result: "success",
-            scores: scores
-          });
-          const fetch_result = await fetchScoreBoard(gameID);
-          sendServerMessage(gameID, playerID, "SCOREBOARD", fetch_result);
+          if (db_update_result.rowCount === 1) {
+            const scores = getTempScores(gameID, playerID);
+            res.json({ 
+              result: "success",
+              scores: scores
+            });
+            const fetch_result = await fetchScoreBoard(gameID);
+            sendServerMessage(gameID, playerID, "SCOREBOARD", fetch_result);
+          } else {
+            res.json({ 
+              result: "error",
+              err_msg: "DB error in /register: record not updated"
+            });
+          };
 /*          fetchPendingPayment(gameID, playerID);*/
         } catch (err) {
           res.json({ 
@@ -1051,4 +1062,6 @@ app.get("*", (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`HTTP server listening on ${PORT}`);
+}).on('error', (err) => {
+  console.log(err);
 });
